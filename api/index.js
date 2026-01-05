@@ -2,25 +2,40 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 
-// controllers import
+// Import controller
 const { registerUser, loginUser } = require("../controllers/authController");
 
 const app = express();
 
-// middleware
 app.use(cors({
-  origin: "https://task-flow-frontend-six.vercel.app/", // frontend URL
+  origin: "https://task-flow-frontend-six.vercel.app/",
   credentials: true
 }));
 app.use(express.json());
 
-// MongoDB connection
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("MongoDB connected"))
-  .catch(err => console.log(err));
-
-// Routes (serverless friendly)
+// Routes
 app.post("/api/register", registerUser);
 app.post("/api/login", loginUser);
 
-module.exports = app;  // Important: serverless export
+// Database connection helper (Vercel friendly)
+let isConnected = false; // global cache
+
+async function connectDB() {
+  if (isConnected) return; // already connected
+  await mongoose.connect(process.env.MONGO_URI);
+  isConnected = true;
+  console.log("MongoDB connected ✅");
+}
+
+// Wrap each request with DB connect
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error("DB Connection Error:", err);
+    res.status(500).json({ error: "Database connection failed" });
+  }
+});
+
+module.exports = app; // IMPORTANT for serverless
